@@ -1,17 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
 const { verifyToken } = require('../middleware/authMiddleware');
+const authController = require('../controllers/authController');
 
-// Public routes
-// POST /api/auth/verify - Verify Firebase token from frontend
-router.post('/verify', verifyToken, authController.verifyAuth);
+// Public routes (need token but no profile)
+router.get('/check', verifyToken, authController.checkHost);
 
-// POST /api/auth/sync - Sync user data after signup
-router.post('/sync', verifyToken, authController.syncUser);
-
-// Protected admin routes
-// GET /api/auth/users - Get all users (admin only)
-router.get('/users', verifyToken, authController.getAllUsers);
+// Protected routes
+router.post('/signup', verifyToken, authController.createHost);
+router.post('/login', verifyToken, authController.loginHost);
+router.put('/profile', verifyToken, authController.updateProfile);
 
 module.exports = router;

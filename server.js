@@ -1,66 +1,57 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const ticketRoutes = require('./routes/ticketRoutes');
-const errorHandler = require('./middleware/errorHandler');
+const hostRoutes = require('./routes/hostRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
+const collegeRoutes = require('./routes/collegeRoutes');
+const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'http://127.0.0.1:5500', // Live Server
-    'https://your-frontend.vercel.app', // Your Vercel frontend
-    'https://nexus-app.vercel.app'
-  ],
-  credentials: true
+  origin: '*', // In production, specify your domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Logging
-app.use(morgan('dev'));
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
 
 // Body parsing
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/host', hostRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/colleges', collegeRoutes);
+
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    service: 'Nexus Backend'
-  });
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/tickets', ticketRoutes);
+// Error handling
+app.use(errorMiddleware);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found' 
-  });
+  res.status(404).json({ error: 'Route not found' });
 });
 
-// Global error handler
-app.use(errorHandler);
-
-// Start server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Nexus Backend running on port ${PORT}`);
+  console.log(`🚀 Nexus Host API running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
-
-// Export for Vercel serverless
-module.exports = app;

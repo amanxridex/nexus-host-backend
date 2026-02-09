@@ -1,97 +1,178 @@
-const { auth } = require('../config/firebase');
+const supabase = require('../config/database');
+const admin = require('../config/firebase');
 
-// Verify token and return user data (called after frontend auth)
-exports.verifyAuth = async (req, res) => {
+// Check if host exists
+exports.checkHost = async (req, res) => {
   try {
-    // req.user is set by verifyToken middleware
-    const user = req.user;
-    
-    // You can fetch additional user data from your database here
-    // const dbUser = await User.findOne({ uid: user.uid });
-    
-    res.status(200).json({
-      success: true,
-      message: 'Authenticated successfully',
-      user: {
-        uid: user.uid,
-        phone: user.phone,
-        email: user.email,
-        name: user.name,
-        photoURL: user.picture,
-        // Add custom fields from your DB
-        // kycVerified: dbUser?.kycVerified || false,
-        // walletBalance: dbUser?.walletBalance || 0
-      }
+    const { uid } = req.user;
+
+    const { data, error } = await supabase
+      .from('hosts')
+      .select('id, verification_status, is_active')
+      .eq('firebase_uid', uid)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+
+    res.json({
+      exists: !!data,
+      status: data?.verification_status || null,
+      isActive: data?.is_active || false
     });
-    
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Authentication verification failed'
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Create or update user in database after Firebase auth
-exports.syncUser = async (req, res) => {
+// Create new host (signup)
+exports.createHost = async (req, res) => {
   try {
-    const { uid, phone, email, name, photoURL } = req.user;
-    
-    // Example: Update or create in MongoDB
-    /*
-    const user = await User.findOneAndUpdate(
-      { uid },
-      { 
-        uid,
-        phone,
+    const { uid, email } = req.user;
+    const {
+      full_name,
+      phone,
+      college_name,
+      registration_number,
+      designation,
+      department,
+      year_of_study,
+      id_card_url
+    } = req.body;
+
+    // Validate required fields
+    if (!full_name || !phone || !college_name || !registration_number) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['full_name', 'phone', 'college_name', 'registration_number']
+      });
+    }
+
+    // Check if host already exists
+    const { data: existing } = await supabase
+      .from('hosts')
+      .select('id')
+      .eq('firebase_uid', uid)
+      .single();
+
+    if (existing) {
+      return res.status(409).json({ error: 'Host already registered' });
+    }
+
+    // Create host
+    const { data, error } = await supabase
+      .from('hosts')
+      .insert({
+        firebase_uid: uid,
         email,
-        name,
-        photoURL,
-        lastLogin: new Date()
-      },
-      { upsert: true, new: true }
-    );
-    */
-    
-    res.status(200).json({
+        full_name,
+        phone,
+        college_name,
+        registration_number,
+        designation: designation || 'Student Organizer',
+        department,
+        year_of_study,
+        id_card_url,
+        verification_status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Log activity
+    await supabase
+      .from('host_activity_log')
+      .insert({
+        host_id: data.id,
+        activity_type: 'signup',
+        activity_data: { email, college_name }
+      });
+
+    res.status(201).json({
       success: true,
-      message: 'User synced successfully',
-      user: { uid, phone, email, name, photoURL }
+      message: 'Host registered successfully. Pending verification.',
+      data
     });
-    
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to sync user'
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Admin: Get all users (example admin route)
-exports.getAllUsers = async (req, res) => {
+// Login host (get profile)
+exports.loginHost = async (req, res) => {
   try {
-    // Only allow admin users
-    // if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin only' });
-    
-    const listUsers = await auth.listUsers();
-    const users = listUsers.users.map(user => ({
-      uid: user.uid,
-      phone: user.phoneNumber,
-      email: user.email,
-      name: user.displayName,
-      createdAt: user.metadata.creationTime
-    }));
-    
-    res.status(200).json({
+    const { uid } = req.user;
+
+    const { data, error } = await supabase
+      .from('hosts')
+      .select('*')
+      .eq('firebase_uid', uid)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ 
+          error: 'Host not found',
+          needsProfile: true 
+        });
+      }
+      throw error;
+    }
+
+    if (!data.is_active) {
+      return res.status(403).json({ 
+        error: 'Account deactivated',
+        reason: data.block_reason || 'Contact support'
+      });
+    }
+
+    // Log login activity
+    await supabase
+      .from('host_activity_log')
+      .insert({
+        host_id: data.id,
+        activity_type: 'login',
+        activity_data: { ip: req.ip, user_agent: req.headers['user-agent'] }
+      });
+
+    res.json({
       success: true,
-      count: users.length,
-      users
+      data
     });
-    
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch users'
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update host profile
+exports.updateProfile = async (req, res) => {
+  try {
+    const { uid } = req.user;
+    const updates = req.body;
+
+    // Remove fields that shouldn't be updated directly
+    delete updates.firebase_uid;
+    delete updates.email;
+    delete updates.verification_status;
+    delete updates.created_at;
+
+    const { data, error } = await supabase
+      .from('hosts')
+      .update(updates)
+      .eq('firebase_uid', uid)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Profile updated',
+      data
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
