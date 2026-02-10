@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authenticateHost = require('../middleware/authMiddleware');
-const uploadMiddleware = require('../middleware/uploadMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -146,11 +145,31 @@ router.get('/draft', authenticateHost, async (req, res) => {
             .eq('firebase_uid', firebaseUid)
             .single();
 
-        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+        if (error && error.code !== 'PGRST116') throw error;
 
         res.json({ success: true, draft: data });
     } catch (error) {
         res.status(500).json({ error: 'Failed to load draft' });
+    }
+});
+
+// ============================================
+// DELETE /api/fest/draft - Delete draft
+// ============================================
+router.delete('/draft', authenticateHost, async (req, res) => {
+    try {
+        const firebaseUid = req.host.firebase_uid;
+
+        const { error } = await supabase
+            .from('fest_drafts')
+            .delete()
+            .eq('firebase_uid', firebaseUid);
+
+        if (error) throw error;
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete draft' });
     }
 });
 
@@ -207,4 +226,7 @@ router.get('/:id', authenticateHost, async (req, res) => {
     }
 });
 
+// ============================================
+// IMPORTANT: Export the router correctly!
+// ============================================
 module.exports = router;
