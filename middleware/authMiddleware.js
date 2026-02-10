@@ -18,19 +18,20 @@ const authenticateHost = async (req, res, next) => {
             return res.status(401).json({ error: 'Invalid token' });
         }
 
-        // Get host data from your hosts table
+        // Attach user to request
+        req.user = user;
+
+        // Try to get host data (optional for some routes)
         const { data: host, error: hostError } = await supabase
             .from('hosts')
             .select('*')
             .eq('firebase_uid', user.id)
             .single();
 
-        if (hostError || !host) {
-            return res.status(404).json({ error: 'Host not found' });
+        if (host && !hostError) {
+            req.host = host;
         }
 
-        req.host = host;
-        req.user = user;
         next();
         
     } catch (error) {
@@ -39,5 +40,5 @@ const authenticateHost = async (req, res, next) => {
     }
 };
 
-// MUST export as function, not object
+// Export as function (NOT as object)
 module.exports = authenticateHost;

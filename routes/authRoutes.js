@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/authMiddleware');
+const authenticateHost = require('../middleware/authMiddleware'); // Changed from verifyToken
 const authController = require('../controllers/authController');
 
 // Public routes (need token but no profile)
-router.get('/check', verifyToken, authController.checkHost);
+router.get('/check', authenticateHost, authController.checkHost);
 
 // Protected routes
-router.post('/signup', verifyToken, authController.createHost);
-router.post('/login', verifyToken, authController.loginHost);
-router.put('/profile', verifyToken, authController.updateProfile);
+router.post('/signup', authenticateHost, authController.createHost);
+router.post('/login', authenticateHost, authController.loginHost);
+router.put('/profile', authenticateHost, authController.updateProfile);
 
 module.exports = router;
