@@ -88,7 +88,7 @@ router.post('/create', authenticateHost, async (req, res) => {
                 contact_email: contactEmail,
                 whatsapp_number: whatsapp,
                 venue,
-                status: 'pending_approval',
+                status: 'published',
                 submitted_at: new Date().toISOString()
             })
             .select()
