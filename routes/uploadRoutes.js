@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/authMiddleware');
+const authenticateHost = require('../middleware/authMiddleware');  // ✅ Fixed import
 const { upload, handleUploadError } = require('../middleware/uploadMiddleware');
 const uploadController = require('../controllers/uploadController');
 
 // Upload ID card
 router.post(
   '/id-card',
-  verifyToken,
+  authenticateHost,  // ✅ Changed from verifyToken
   upload.single('file'),
   handleUploadError,
   uploadController.uploadIdCard
@@ -16,7 +16,7 @@ router.post(
 // Upload avatar
 router.post(
   '/avatar',
-  verifyToken,
+  authenticateHost,  // ✅ Changed from verifyToken
   upload.single('file'),
   handleUploadError,
   uploadController.uploadAvatar
