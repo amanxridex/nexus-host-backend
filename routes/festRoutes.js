@@ -240,4 +240,93 @@ router.get('/:id', authenticateHost, async (req, res) => {
     }
 });
 
+// GET FESTS BY COLLEGE (Public - for user portal)
+router.get('/by-college/:collegeId', async (req, res) => {
+    try {
+        const { collegeId } = req.params;
+
+        // First, get the college name
+        const { data: college, error: collegeError } = await supabase
+            .from('colleges')
+            .select('name')
+            .eq('id', collegeId)
+            .single();
+
+        if (collegeError || !college) {
+            return res.status(404).json({ error: 'College not found' });
+        }
+
+        // Get hosts from this college
+        const { data: hosts, error: hostsError } = await supabase
+            .from('hosts')
+            .select('id, firebase_uid')
+            .ilike('college_name', `%${college.name}%`);
+
+        if (hostsError) throw hostsError;
+
+        if (!hosts || hosts.length === 0) {
+            return res.json({ success: true, fests: [], college: college.name });
+        }
+
+        const hostIds = hosts.map(h => h.id);
+        const firebaseUids = hosts.map(h => h.firebase_uid);
+
+        // Get fests from these hosts
+        const { data: fests, error: festsError } = await supabase
+            .from('fests')
+            .select(`
+                *,
+                fest_analytics (
+                    total_views,
+                    total_registrations,
+                    total_tickets_sold,
+                    total_revenue
+                )
+            `)
+            .in('host_id', hostIds)
+            .eq('status', 'published')
+            .order('created_at', { ascending: false });
+
+        if (festsError) throw festsError;
+
+        // Format for frontend
+        const formattedFests = fests.map(fest => ({
+            id: fest.id,
+            name: fest.fest_name,
+            category: fest.fest_type,
+            date: formatDateRange(fest.start_date, fest.end_date),
+            time: '10:00 AM', // Default or add to schema
+            venue: fest.venue,
+            price: fest.is_paid ? fest.ticket_price : 0,
+            image: fest.banner_url || 'assets/college-fest.jpg',
+            description: fest.description,
+            lineup: [], // Add later if needed
+            host_college: college.name
+        }));
+
+        res.json({ 
+            success: true, 
+            fests: formattedFests,
+            college: college.name
+        });
+
+    } catch (error) {
+        console.error('Get fests by college error:', error);
+        res.status(500).json({ error: 'Failed to fetch fests' });
+    }
+});
+
+// Helper function
+function formatDateRange(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const options = { month: 'short', day: 'numeric', year: 'numeric' };
+    
+    if (start === end) {
+        return startDate.toLocaleDateString('en-US', options);
+    }
+    
+    return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+}
+
 module.exports = router;
