@@ -5,10 +5,25 @@ const authenticateHost = require('../middleware/authMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// CREATE FEST
 router.post('/create', authenticateHost, async (req, res) => {
     try {
-        const hostId = req.host.id;
-        const firebaseUid = req.host.firebase_uid;
+        // Get firebase_uid from req.user (set by authMiddleware)
+        const firebaseUid = req.user.uid;
+        
+        // Lookup host in database to get host_id
+        const { data: host, error: hostError } = await supabase
+            .from('hosts')
+            .select('id')
+            .eq('firebase_uid', firebaseUid)
+            .single();
+
+        if (hostError || !host) {
+            console.error('Host lookup failed:', hostError);
+            return res.status(404).json({ error: 'Host profile not found. Please complete your profile first.' });
+        }
+
+        const hostId = host.id;
         
         const {
             festName, festType, description, expectedAttendance,
@@ -95,10 +110,23 @@ router.post('/create', authenticateHost, async (req, res) => {
     }
 });
 
+// SAVE DRAFT
 router.post('/draft', authenticateHost, async (req, res) => {
     try {
-        const hostId = req.host.id;
-        const firebaseUid = req.host.firebase_uid;
+        const firebaseUid = req.user.uid;
+        
+        // Lookup host
+        const { data: host, error: hostError } = await supabase
+            .from('hosts')
+            .select('id')
+            .eq('firebase_uid', firebaseUid)
+            .single();
+
+        if (hostError || !host) {
+            return res.status(404).json({ error: 'Host not found' });
+        }
+
+        const hostId = host.id;
         const draftData = req.body;
 
         const { data, error } = await supabase
@@ -117,13 +145,15 @@ router.post('/draft', authenticateHost, async (req, res) => {
 
         res.json({ success: true, draft: data });
     } catch (error) {
+        console.error('Save draft error:', error);
         res.status(500).json({ error: 'Failed to save draft' });
     }
 });
 
+// GET DRAFT
 router.get('/draft', authenticateHost, async (req, res) => {
     try {
-        const firebaseUid = req.host.firebase_uid;
+        const firebaseUid = req.user.uid;
 
         const { data, error } = await supabase
             .from('fest_drafts')
@@ -135,13 +165,15 @@ router.get('/draft', authenticateHost, async (req, res) => {
 
         res.json({ success: true, draft: data });
     } catch (error) {
+        console.error('Get draft error:', error);
         res.status(500).json({ error: 'Failed to load draft' });
     }
 });
 
+// DELETE DRAFT
 router.delete('/draft', authenticateHost, async (req, res) => {
     try {
-        const firebaseUid = req.host.firebase_uid;
+        const firebaseUid = req.user.uid;
 
         const { error } = await supabase
             .from('fest_drafts')
@@ -152,13 +184,15 @@ router.delete('/draft', authenticateHost, async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
+        console.error('Delete draft error:', error);
         res.status(500).json({ error: 'Failed to delete draft' });
     }
 });
 
+// GET MY FESTS
 router.get('/my-fests', authenticateHost, async (req, res) => {
     try {
-        const firebaseUid = req.host.firebase_uid;
+        const firebaseUid = req.user.uid;
 
         const { data, error } = await supabase
             .from('fests')
@@ -178,14 +212,16 @@ router.get('/my-fests', authenticateHost, async (req, res) => {
 
         res.json({ success: true, fests: data });
     } catch (error) {
+        console.error('Get fests error:', error);
         res.status(500).json({ error: 'Failed to fetch fests' });
     }
 });
 
+// GET SINGLE FEST
 router.get('/:id', authenticateHost, async (req, res) => {
     try {
         const { id } = req.params;
-        const firebaseUid = req.host.firebase_uid;
+        const firebaseUid = req.user.uid;
 
         const { data, error } = await supabase
             .from('fests')
@@ -199,6 +235,7 @@ router.get('/:id', authenticateHost, async (req, res) => {
 
         res.json({ success: true, fest: data });
     } catch (error) {
+        console.error('Get fest error:', error);
         res.status(500).json({ error: 'Failed to fetch fest' });
     }
 });
