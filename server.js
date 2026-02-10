@@ -13,41 +13,34 @@ const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
 
-// Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: '*', // In production, specify your domain
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
 app.use(limiter);
 
-// Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/host', hostRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/colleges', collegeRoutes);
 app.use('/api/fest', festRoutes);
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Error handling
 app.use(errorMiddleware);
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });

@@ -11,17 +11,14 @@ const authenticateHost = async (req, res, next) => {
 
         const token = authHeader.split(' ')[1];
         
-        // Verify token with Supabase
         const { data: { user }, error } = await supabase.auth.getUser(token);
         
         if (error || !user) {
             return res.status(401).json({ error: 'Invalid token' });
         }
 
-        // Attach user to request
         req.user = user;
 
-        // Try to get host data (optional for some routes)
         const { data: host, error: hostError } = await supabase
             .from('hosts')
             .select('*')
@@ -40,5 +37,4 @@ const authenticateHost = async (req, res, next) => {
     }
 };
 
-// Export as function (NOT as object)
 module.exports = authenticateHost;

@@ -5,9 +5,6 @@ const authenticateHost = require('../middleware/authMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-// ============================================
-// POST /api/fest/create - Create new fest
-// ============================================
 router.post('/create', authenticateHost, async (req, res) => {
     try {
         const hostId = req.host.id;
@@ -21,12 +18,10 @@ router.post('/create', authenticateHost, async (req, res) => {
             whatsapp, venue, bannerImage
         } = req.body;
 
-        // Validation
         if (!festName || !festType || !description || !startDate || !endDate) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Handle banner upload if base64 image provided
         let bannerUrl = null;
         if (bannerImage && bannerImage.startsWith('data:image')) {
             const base64Data = bannerImage.replace(/^data:image\/\w+;base64,/, '');
@@ -51,7 +46,6 @@ router.post('/create', authenticateHost, async (req, res) => {
             bannerUrl = publicUrl;
         }
 
-        // Insert fest
         const { data: fest, error } = await supabase
             .from('fests')
             .insert({
@@ -87,7 +81,6 @@ router.post('/create', authenticateHost, async (req, res) => {
 
         if (error) throw error;
 
-        // Create analytics entry
         await supabase.from('fest_analytics').insert({ fest_id: fest.id });
 
         res.status(201).json({
@@ -102,16 +95,12 @@ router.post('/create', authenticateHost, async (req, res) => {
     }
 });
 
-// ============================================
-// POST /api/fest/draft - Save draft
-// ============================================
 router.post('/draft', authenticateHost, async (req, res) => {
     try {
         const hostId = req.host.id;
         const firebaseUid = req.host.firebase_uid;
         const draftData = req.body;
 
-        // Upsert draft
         const { data, error } = await supabase
             .from('fest_drafts')
             .upsert({
@@ -132,9 +121,6 @@ router.post('/draft', authenticateHost, async (req, res) => {
     }
 });
 
-// ============================================
-// GET /api/fest/draft - Get draft
-// ============================================
 router.get('/draft', authenticateHost, async (req, res) => {
     try {
         const firebaseUid = req.host.firebase_uid;
@@ -153,9 +139,6 @@ router.get('/draft', authenticateHost, async (req, res) => {
     }
 });
 
-// ============================================
-// DELETE /api/fest/draft - Delete draft
-// ============================================
 router.delete('/draft', authenticateHost, async (req, res) => {
     try {
         const firebaseUid = req.host.firebase_uid;
@@ -173,9 +156,6 @@ router.delete('/draft', authenticateHost, async (req, res) => {
     }
 });
 
-// ============================================
-// GET /api/fest/my-fests - Get host's fests
-// ============================================
 router.get('/my-fests', authenticateHost, async (req, res) => {
     try {
         const firebaseUid = req.host.firebase_uid;
@@ -202,9 +182,6 @@ router.get('/my-fests', authenticateHost, async (req, res) => {
     }
 });
 
-// ============================================
-// GET /api/fest/:id - Get single fest
-// ============================================
 router.get('/:id', authenticateHost, async (req, res) => {
     try {
         const { id } = req.params;
@@ -226,7 +203,4 @@ router.get('/:id', authenticateHost, async (req, res) => {
     }
 });
 
-// ============================================
-// IMPORTANT: Export the router correctly!
-// ============================================
 module.exports = router;
