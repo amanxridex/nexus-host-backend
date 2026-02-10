@@ -1,5 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const admin = require('../config/firebase');
 
 const authenticateHost = async (req, res, next) => {
     try {
@@ -11,18 +10,22 @@ const authenticateHost = async (req, res, next) => {
 
         const token = authHeader.split(' ')[1];
         
-        const { data: { user }, error } = await supabase.auth.getUser(token);
+        // ✅ FIXED: Use Firebase Admin to verify token
+        const decodedToken = await admin.auth().verifyIdToken(token);
         
-        if (error || !user) {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
+        const user = {
+            uid: decodedToken.uid,
+            email: decodedToken.email
+        };
 
         req.user = user;
 
+        // Check if host exists in database
+        const supabase = require('../config/database');
         const { data: host, error: hostError } = await supabase
             .from('hosts')
             .select('*')
-            .eq('firebase_uid', user.id)
+            .eq('firebase_uid', user.uid)
             .single();
 
         if (host && !hostError) {
@@ -33,7 +36,7 @@ const authenticateHost = async (req, res, next) => {
         
     } catch (error) {
         console.error('Auth middleware error:', error);
-        res.status(500).json({ error: 'Authentication failed' });
+        return res.status(401).json({ error: 'Invalid token' });
     }
 };
 
