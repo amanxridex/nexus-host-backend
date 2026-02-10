@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const authenticateHost = require('../middleware/authMiddleware');  // ✅ Fixed
+const authenticateHost = require('../middleware/authMiddleware');
 const collegeController = require('../controllers/collegeController');
 
-// Public routes
+// Public routes (NO AUTH - for user portal)
 router.get('/', collegeController.getColleges);
 router.get('/locations', collegeController.getLocations);
+router.get('/public/all', collegeController.getAllCollegesPublic); // NEW: Public endpoint for user portal
 
-// Protected routes
-router.post('/suggest', authenticateHost, collegeController.suggestCollege);  // ✅ Fixed
+// Protected routes (for host portal)
+router.post('/suggest', authenticateHost, collegeController.suggestCollege);
 
 module.exports = router;

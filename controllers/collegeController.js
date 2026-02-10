@@ -88,3 +88,34 @@ exports.getLocations = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Get all colleges for public user portal (no auth required)
+exports.getAllCollegesPublic = async (req, res) => {
+    try {
+        const { data: colleges, error } = await supabase
+            .from('colleges')
+            .select('id, name, location, campus, image_url')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        // Format for frontend
+        const formattedColleges = colleges.map(college => ({
+            id: college.id,
+            name: college.name,
+            location: college.location || college.campus || 'India',
+            image: college.image_url || 'assets/college-fest.jpg'
+        }));
+
+        res.json({
+            success: true,
+            data: formattedColleges
+        });
+    } catch (error) {
+        console.error('Get all colleges error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch colleges'
+        });
+    }
+};
