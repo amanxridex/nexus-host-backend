@@ -9,6 +9,7 @@ const hostRoutes = require('./routes/hostRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const collegeRoutes = require('./routes/collegeRoutes');
 const festRoutes = require('./routes/festRoutes');
+const scanRoutes = require('./routes/scanRoutes');
 const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/host', hostRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/colleges', collegeRoutes);
 app.use('/api/fest', festRoutes);
+app.use('/api/scan', scanRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
