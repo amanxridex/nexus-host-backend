@@ -335,25 +335,30 @@ router.get('/public/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const { data: fest, error } = await supabase
+        // First, get the fest
+        const { data: fest, error: festError } = await supabase
             .from('fests')
             .select(`
                 *,
-                fest_analytics (*),
-                hosts (
-                    id,
-                    full_name,
-                    college_name,
-                    phone,
-                    email
-                )
+                fest_analytics (*)
             `)
             .eq('id', id)
             .eq('status', 'published')
             .single();
 
-        if (error) throw error;
+        if (festError) throw festError;
         if (!fest) return res.status(404).json({ error: 'Fest not found' });
+
+        // Then, get the host separately
+        const { data: host, error: hostError } = await supabase
+            .from('hosts')
+            .select('id, full_name, college_name, phone, email')
+            .eq('id', fest.host_id)
+            .single();
+
+        if (hostError) {
+            console.error('Host fetch error:', hostError);
+        }
 
         // Format response for frontend
         const formattedFest = {
@@ -362,7 +367,7 @@ router.get('/public/:id', async (req, res) => {
             category: fest.fest_type,
             description: fest.description,
             date: formatDateRange(fest.start_date, fest.end_date),
-            time: '10:00 AM', // Add time field to schema later if needed
+            time: '10:00 AM',
             venue: fest.venue,
             price: fest.is_paid ? fest.ticket_price : 0,
             earlyBirdPrice: fest.early_bird_price,
@@ -374,10 +379,10 @@ router.get('/public/:id', async (req, res) => {
             
             // Host/College info
             college: {
-                name: fest.hosts?.college_name || 'Unknown College',
-                hostName: fest.hosts?.full_name,
-                hostPhone: fest.hosts?.phone,
-                hostEmail: fest.hosts?.email
+                name: host?.college_name || 'Unknown College',
+                hostName: host?.full_name,
+                hostPhone: host?.phone,
+                hostEmail: host?.email
             },
             
             // ID verification
