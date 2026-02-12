@@ -316,6 +316,7 @@ router.get('/by-college/:collegeId', async (req, res) => {
     }
 });
 
+
 // Helper function
 function formatDateRange(start, end) {
     const startDate = new Date(start);
@@ -328,5 +329,77 @@ function formatDateRange(start, end) {
     
     return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
 }
+
+// GET SINGLE FEST DETAILS (Public - for user portal)
+router.get('/public/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data: fest, error } = await supabase
+            .from('fests')
+            .select(`
+                *,
+                fest_analytics (*),
+                hosts (
+                    id,
+                    full_name,
+                    college_name,
+                    phone,
+                    email
+                )
+            `)
+            .eq('id', id)
+            .eq('status', 'published')
+            .single();
+
+        if (error) throw error;
+        if (!fest) return res.status(404).json({ error: 'Fest not found' });
+
+        // Format response for frontend
+        const formattedFest = {
+            id: fest.id,
+            name: fest.fest_name,
+            category: fest.fest_type,
+            description: fest.description,
+            date: formatDateRange(fest.start_date, fest.end_date),
+            time: '10:00 AM', // Add time field to schema later if needed
+            venue: fest.venue,
+            price: fest.is_paid ? fest.ticket_price : 0,
+            earlyBirdPrice: fest.early_bird_price,
+            image: fest.banner_url || 'assets/college-fest.jpg',
+            isPaid: fest.is_paid,
+            isUnlimited: fest.is_unlimited_seats,
+            totalSeats: fest.total_seats,
+            seatsLeft: fest.is_unlimited_seats ? null : (fest.total_seats - (fest.fest_analytics?.total_tickets_sold || 0)),
+            
+            // Host/College info
+            college: {
+                name: fest.hosts?.college_name || 'Unknown College',
+                hostName: fest.hosts?.full_name,
+                hostPhone: fest.hosts?.phone,
+                hostEmail: fest.hosts?.email
+            },
+            
+            // ID verification
+            idRequired: fest.id_verification_required,
+            idFields: fest.id_fields_required,
+            
+            // Audience settings
+            allowOutside: fest.allow_outside_college,
+            allowOtherColleges: fest.allow_other_colleges,
+            allowGeneralPublic: fest.allow_general_public,
+            
+            // Analytics
+            ticketsSold: fest.fest_analytics?.total_tickets_sold || 0,
+            views: fest.fest_analytics?.total_views || 0
+        };
+
+        res.json({ success: true, fest: formattedFest });
+
+    } catch (error) {
+        console.error('Get public fest error:', error);
+        res.status(500).json({ error: 'Failed to fetch fest details' });
+    }
+});
 
 module.exports = router;
