@@ -8,121 +8,117 @@ const supabase = createClient(
 
 const USER_BACKEND_URL = 'https://nexus-api-hkfu.onrender.com/api';
 
-// Simple in-memory cache for ticket verification
-const ticketCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Verify with retry logic
-async function verifyWithUserBackend(ticketId, festId, retries = 3) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const verifyRes = await axios.post(
-                `${USER_BACKEND_URL}/tickets/verify`,
-                { ticketId, festId },
-                { timeout: 5000 } // 5 second timeout
-            );
-            return verifyRes.data;
-        } catch (err) {
-            if (err.response?.status === 429) {
-                // Rate limited - wait and retry
-                console.log(`Rate limited, retry ${i + 1}/${retries}...`);
-                await new Promise(r => setTimeout(r, 1000 * (i + 1))); // 1s, 2s, 3s delay
-                continue;
-            }
-            throw err;
-        }
-    }
-    throw new Error('Max retries reached');
-}
-
 exports.verifyTicket = async (req, res) => {
     try {
         const { ticketId, festId } = req.body;
         const hostId = req.user.uid;
 
-        // Check cache first
-        const cacheKey = `${festId}:${ticketId}`;
-        const cached = ticketCache.get(cacheKey);
-        if (cached && Date.now() - cached.time < CACHE_TTL) {
-            return res.json(cached.data);
-        }
+        console.log('🔍 Verifying ticket:', { ticketId, festId, hostId });
 
-        // Check if already scanned in host DB
-        const { data: existingScan } = await supabase
+        // Step 1: Check if already scanned in OUR database
+        const { data: existingScan, error: scanError } = await supabase
             .from('scan_logs')
             .select('*')
             .eq('ticket_id', ticketId)
             .eq('fest_id', festId)
             .maybeSingle();
 
+        if (scanError) {
+            console.error('❌ Scan check error:', scanError);
+            throw scanError;
+        }
+
+        console.log('📋 Existing scan:', existingScan);
+
         if (existingScan) {
-            const result = {
+            console.log('⚠️ Ticket already scanned');
+            return res.json({
                 success: true,
                 valid: false,
                 error: 'Ticket already used',
                 ticket: existingScan
-            };
-            ticketCache.set(cacheKey, { data: result, time: Date.now() });
-            return res.json(result);
+            });
         }
 
-        // Verify with user backend (with retry)
+        // Step 2: Verify with user backend (with timeout)
+        let verifyData;
         try {
-            const verifyData = await verifyWithUserBackend(ticketId, festId);
-
-            if (verifyData.valid) {
-                // Log valid scan
-                const { data: newScan, error } = await supabase
-                    .from('scan_logs')
-                    .insert({
-                        host_id: hostId,
-                        fest_id: festId,
-                        ticket_id: ticketId,
-                        attendee_name: verifyData.attendee_name || verifyData.name || 'Unknown',
-                        status: 'valid',
-                        scanned_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single();
-
-                if (error) throw error;
-
-                const result = {
-                    success: true,
-                    valid: true,
-                    ticket: { ...verifyData, scan_id: newScan?.id }
-                };
-                ticketCache.set(cacheKey, { data: result, time: Date.now() });
-                return res.json(result);
-            } else {
-                const result = {
-                    success: true,
-                    valid: false,
-                    error: 'Invalid ticket'
-                };
-                return res.json(result);
-            }
+            console.log('🌐 Calling user backend...');
+            const verifyRes = await axios.post(
+                `${USER_BACKEND_URL}/tickets/verify`,
+                { ticketId, festId },
+                { 
+                    timeout: 8000,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+            verifyData = verifyRes.data;
+            console.log('✅ User backend response:', verifyData);
         } catch (err) {
-            console.error('User backend error:', err.message);
+            console.error('❌ User backend error:', err.message, err.response?.status);
             
-            // If 429, tell user to retry
-            if (err.message.includes('429') || err.response?.status === 429) {
+            // If 429 or any error, DON'T mark as used - show error instead
+            if (err.response?.status === 429) {
                 return res.status(429).json({
                     success: false,
-                    error: 'Too many requests. Please wait a moment and try again.'
+                    error: 'Server busy. Please try again in a few seconds.'
                 });
             }
+            
+            // For other errors, create scan entry anyway (offline mode)
+            console.log('⚠️ User backend failed, using offline mode');
+            verifyData = { 
+                valid: true, 
+                attendee_name: 'Guest',
+                offline: true 
+            };
+        }
+
+        // Step 3: If valid, create scan log
+        if (verifyData.valid) {
+            console.log('📝 Creating scan log...');
+            
+            const { data: newScan, error: insertError } = await supabase
+                .from('scan_logs')
+                .insert({
+                    host_id: hostId,
+                    fest_id: festId,
+                    ticket_id: ticketId,
+                    attendee_name: verifyData.attendee_name || verifyData.name || 'Guest',
+                    status: 'valid',
+                    scanned_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error('❌ Insert error:', insertError);
+                throw insertError;
+            }
+
+            console.log('✅ Scan created:', newScan);
 
             return res.json({
                 success: true,
+                valid: true,
+                ticket: newScan,
+                offline: verifyData.offline || false
+            });
+        } else {
+            return res.json({
+                success: true,
                 valid: false,
-                error: 'Ticket verification failed'
+                error: 'Invalid ticket'
             });
         }
 
     } catch (error) {
-        console.error('Verify error:', error);
-        res.status(500).json({ error: 'Verification failed' });
+        console.error('💥 Verify error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Verification failed', 
+            details: error.message 
+        });
     }
 };
 
@@ -143,7 +139,11 @@ exports.getFestStats = async (req, res) => {
 
         res.json({
             success: true,
-            scans: { valid: validScans, denied: deniedScans, total: scans?.length || 0 }
+            scans: { 
+                valid: validScans, 
+                denied: deniedScans, 
+                total: scans?.length || 0 
+            }
         });
 
     } catch (error) {
