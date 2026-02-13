@@ -57,16 +57,15 @@ exports.verifyTicket = async (req, res) => {
             });
         }
 
-        // ✅ FIX: Proper name extraction with priority
+        // Extract attendee name
         const attendeeName = 
-            ticketDetails.attendee_name ||  // Priority 1: direct field
-            ticketDetails.name ||           // Priority 2: name field
-            ticketDetails.user_name ||      // Priority 3: user name
-            ticketDetails.user?.name ||     // Priority 4: nested user
-            ticketDetails.user?.full_name ||
+            ticketDetails.attendee_name ||
+            ticketDetails.name ||
+            ticketDetails.user_name ||
+            ticketDetails.user?.name ||
             'Guest';
 
-        console.log('👤 Final attendee name:', attendeeName);
+        console.log('👤 Attendee:', attendeeName);
 
         // Check fest match
         if (ticketDetails.fest_id !== festId) {
@@ -94,7 +93,7 @@ exports.verifyTicket = async (req, res) => {
                 host_id: hostId,
                 fest_id: festId,
                 ticket_id: ticketId,
-                attendee_name: attendeeName,  // ✅ Should be "Mithun" now
+                attendee_name: attendeeName,
                 status: 'valid',
                 scanned_at: new Date().toISOString()
             })
@@ -103,22 +102,27 @@ exports.verifyTicket = async (req, res) => {
 
         if (insertError) throw insertError;
 
-        // Mark used in user backend
+        // ✅ FIXED: Mark used WITHOUT auth header (different Firebase projects)
         try {
-            const updateRes = await axios.patch(
+            console.log('📝 Marking ticket as used...');
+            
+            await axios.patch(
                 `${USER_BACKEND_URL}/tickets/${ticketId}/mark-used`,
                 { 
                     used_at: new Date().toISOString(),
                     scanned_by: hostId 
                 },
                 { 
-                    timeout: 5000,
-                    headers: { 'Authorization': req.headers.authorization }
+                    timeout: 5000
+                    // NO Authorization header - user backend doesn't verify host tokens
                 }
             );
-            console.log('✅ Marked used:', updateRes.data);
+            
+            console.log('✅ Ticket marked as used');
+            
         } catch (updateErr) {
             console.error('⚠️ Failed to mark used:', updateErr.message);
+            // Non-critical error, scan already created
         }
 
         res.json({
