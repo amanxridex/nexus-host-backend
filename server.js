@@ -14,6 +14,9 @@ const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
 
+// ✅ Trust proxy for Render (fixes rate-limit warning)
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
   origin: '*',
@@ -23,7 +26,13 @@ app.use(cors({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100
+  max: 100,
+  // ✅ Custom key generator for Render proxy
+  keyGenerator: (req) => {
+    return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
+  },
+  // ✅ Skip validation warning
+  validate: { xForwardedForHeader: false }
 });
 app.use(limiter);
 
