@@ -16,7 +16,7 @@ exports.verifyTicket = async (req, res) => {
 
         console.log('🔍 Verifying:', { ticketId, festId });
 
-        // Step 1: Check if already scanned in host DB
+        // Check existing scan
         const { data: existingScan } = await supabase
             .from('scan_logs')
             .select('*')
@@ -33,12 +33,10 @@ exports.verifyTicket = async (req, res) => {
             });
         }
 
-        // Step 2: ✅ MUST verify from user backend - NO OFFLINE MODE
+        // Get from user backend
         let ticketDetails = null;
         
         try {
-            console.log('🌐 Verifying with user backend...');
-            
             const ticketRes = await axios.get(
                 `${USER_BACKEND_URL}/tickets/by-ticket-id/${ticketId}`,
                 { 
@@ -48,20 +46,29 @@ exports.verifyTicket = async (req, res) => {
             );
             
             ticketDetails = ticketRes.data;
-            console.log('✅ Ticket found:', ticketDetails);
+            console.log('✅ User backend response:', ticketDetails);
 
         } catch (err) {
-            console.error('❌ Invalid ticket:', err.message);
-            
-            // ✅ REJECT if user backend fails or ticket not found
+            console.error('❌ User backend error:', err.message);
             return res.json({
                 success: true,
                 valid: false,
-                error: 'Invalid ticket - Not found in system'
+                error: 'Invalid ticket'
             });
         }
 
-        // Step 3: ✅ Check if ticket belongs to this fest
+        // ✅ FIX: Proper name extraction with priority
+        const attendeeName = 
+            ticketDetails.attendee_name ||  // Priority 1: direct field
+            ticketDetails.name ||           // Priority 2: name field
+            ticketDetails.user_name ||      // Priority 3: user name
+            ticketDetails.user?.name ||     // Priority 4: nested user
+            ticketDetails.user?.full_name ||
+            'Guest';
+
+        console.log('👤 Final attendee name:', attendeeName);
+
+        // Check fest match
         if (ticketDetails.fest_id !== festId) {
             return res.json({
                 success: true,
@@ -70,7 +77,7 @@ exports.verifyTicket = async (req, res) => {
             });
         }
 
-        // Step 4: ✅ Check if already used
+        // Check already used
         if (ticketDetails.used_at) {
             return res.json({
                 success: true,
@@ -80,19 +87,14 @@ exports.verifyTicket = async (req, res) => {
             });
         }
 
-        // Step 5: Create scan log (only for valid tickets)
-        const attendeeName = ticketDetails.attendee_name 
-            || ticketDetails.name 
-            || ticketDetails.user?.name
-            || 'Guest';
-
+        // Create scan log
         const { data: newScan, error: insertError } = await supabase
             .from('scan_logs')
             .insert({
                 host_id: hostId,
                 fest_id: festId,
                 ticket_id: ticketId,
-                attendee_name: attendeeName,
+                attendee_name: attendeeName,  // ✅ Should be "Mithun" now
                 status: 'valid',
                 scanned_at: new Date().toISOString()
             })
@@ -101,11 +103,9 @@ exports.verifyTicket = async (req, res) => {
 
         if (insertError) throw insertError;
 
-        console.log('✅ Scan created:', newScan);
-
-        // Step 6: Mark as used in user backend
+        // Mark used in user backend
         try {
-            await axios.patch(
+            const updateRes = await axios.patch(
                 `${USER_BACKEND_URL}/tickets/${ticketId}/mark-used`,
                 { 
                     used_at: new Date().toISOString(),
@@ -116,7 +116,7 @@ exports.verifyTicket = async (req, res) => {
                     headers: { 'Authorization': req.headers.authorization }
                 }
             );
-            console.log('✅ Marked as used');
+            console.log('✅ Marked used:', updateRes.data);
         } catch (updateErr) {
             console.error('⚠️ Failed to mark used:', updateErr.message);
         }
