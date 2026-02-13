@@ -6,7 +6,7 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ✅ FIXED: Removed trailing space
+// ✅ FIXED: No trailing space
 const USER_BACKEND_URL = 'https://nexus-api-hkfu.onrender.com/api';
 
 exports.verifyTicket = async (req, res) => {
@@ -16,7 +16,7 @@ exports.verifyTicket = async (req, res) => {
 
         console.log('🔍 Verifying:', { ticketId, festId });
 
-        // Step 1: Check if already scanned
+        // Step 1: Check if already scanned in host DB
         const { data: existingScan } = await supabase
             .from('scan_logs')
             .select('*')
@@ -33,12 +33,11 @@ exports.verifyTicket = async (req, res) => {
             });
         }
 
-        // Step 2: Get ticket details from user backend
+        // Step 2: ✅ MUST verify from user backend - NO OFFLINE MODE
         let ticketDetails = null;
-        let userBackendSuccess = false;
-
+        
         try {
-            console.log('🌐 Getting ticket details...');
+            console.log('🌐 Verifying with user backend...');
             
             const ticketRes = await axios.get(
                 `${USER_BACKEND_URL}/tickets/by-ticket-id/${ticketId}`,
@@ -49,33 +48,44 @@ exports.verifyTicket = async (req, res) => {
             );
             
             ticketDetails = ticketRes.data;
-            userBackendSuccess = true;
             console.log('✅ Ticket found:', ticketDetails);
 
         } catch (err) {
-            console.error('❌ Get ticket error:', err.message, err.response?.status);
+            console.error('❌ Invalid ticket:', err.message);
             
-            // Only fail if rate limited, otherwise continue offline
-            if (err.response?.status === 429) {
-                return res.status(429).json({
-                    success: false,
-                    error: 'Server busy. Please try again.'
-                });
-            }
-            
-            console.log('⚠️ User backend unavailable, using offline mode');
+            // ✅ REJECT if user backend fails or ticket not found
+            return res.json({
+                success: true,
+                valid: false,
+                error: 'Invalid ticket - Not found in system'
+            });
         }
 
-        // Step 3: Extract attendee name
-        const attendeeName = ticketDetails?.attendee_name 
-            || ticketDetails?.name 
-            || ticketDetails?.user?.name
-            || ticketDetails?.user_name
+        // Step 3: ✅ Check if ticket belongs to this fest
+        if (ticketDetails.fest_id !== festId) {
+            return res.json({
+                success: true,
+                valid: false,
+                error: 'Ticket not valid for this event'
+            });
+        }
+
+        // Step 4: ✅ Check if already used
+        if (ticketDetails.used_at) {
+            return res.json({
+                success: true,
+                valid: false,
+                error: 'Ticket already used',
+                used_at: ticketDetails.used_at
+            });
+        }
+
+        // Step 5: Create scan log (only for valid tickets)
+        const attendeeName = ticketDetails.attendee_name 
+            || ticketDetails.name 
+            || ticketDetails.user?.name
             || 'Guest';
 
-        console.log('👤 Attendee:', attendeeName);
-
-        // Step 4: Create scan log
         const { data: newScan, error: insertError } = await supabase
             .from('scan_logs')
             .insert({
@@ -93,28 +103,22 @@ exports.verifyTicket = async (req, res) => {
 
         console.log('✅ Scan created:', newScan);
 
-        // Step 5: Mark as used in user backend
-        if (userBackendSuccess) {
-            try {
-                console.log('📝 Marking ticket as used...');
-                
-                await axios.patch(
-                    `${USER_BACKEND_URL}/tickets/${ticketId}/mark-used`,
-                    { 
-                        used_at: new Date().toISOString(),
-                        scanned_by: hostId 
-                    },
-                    { 
-                        timeout: 5000,
-                        headers: { 'Authorization': req.headers.authorization }
-                    }
-                );
-                
-                console.log('✅ Ticket marked as used');
-                
-            } catch (updateErr) {
-                console.error('⚠️ Failed to update used_at:', updateErr.message);
-            }
+        // Step 6: Mark as used in user backend
+        try {
+            await axios.patch(
+                `${USER_BACKEND_URL}/tickets/${ticketId}/mark-used`,
+                { 
+                    used_at: new Date().toISOString(),
+                    scanned_by: hostId 
+                },
+                { 
+                    timeout: 5000,
+                    headers: { 'Authorization': req.headers.authorization }
+                }
+            );
+            console.log('✅ Marked as used');
+        } catch (updateErr) {
+            console.error('⚠️ Failed to mark used:', updateErr.message);
         }
 
         res.json({
@@ -131,8 +135,6 @@ exports.verifyTicket = async (req, res) => {
         });
     }
 };
-
-// ... rest same (getFestStats, getRecentScans, logDenied)
 
 // Get fest stats
 exports.getFestStats = async (req, res) => {
