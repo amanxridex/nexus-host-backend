@@ -14,7 +14,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Verify with retry logic
 async function verifyWithUserBackend(ticketId, festId, retries = 3) {
-    for (let i = 0; i < i < retries; i++) {
+    for (let i = 0; i < retries; i++) {
         try {
             const verifyRes = await axios.post(
                 `${USER_BACKEND_URL}/tickets/verify`,
