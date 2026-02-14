@@ -1,12 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+
+// ✅ FIXED: Use verifyHostSession only
 const { verifyHostSession } = require('../middleware/authMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // CREATE FEST
-router.post('/create', authenticateHost, async (req, res) => {
+// ✅ FIXED: Changed from authenticateHost to verifyHostSession
+router.post('/create', verifyHostSession, async (req, res) => {
     try {
         // Get firebase_uid from req.user (set by authMiddleware)
         const firebaseUid = req.user.uid;
@@ -111,7 +114,8 @@ router.post('/create', authenticateHost, async (req, res) => {
 });
 
 // SAVE DRAFT
-router.post('/draft', authenticateHost, async (req, res) => {
+// ✅ FIXED: Changed from authenticateHost to verifyHostSession
+router.post('/draft', verifyHostSession, async (req, res) => {
     try {
         const firebaseUid = req.user.uid;
         
@@ -151,7 +155,8 @@ router.post('/draft', authenticateHost, async (req, res) => {
 });
 
 // GET DRAFT
-router.get('/draft', authenticateHost, async (req, res) => {
+// ✅ FIXED: Changed from authenticateHost to verifyHostSession
+router.get('/draft', verifyHostSession, async (req, res) => {
     try {
         const firebaseUid = req.user.uid;
 
@@ -171,7 +176,8 @@ router.get('/draft', authenticateHost, async (req, res) => {
 });
 
 // DELETE DRAFT
-router.delete('/draft', authenticateHost, async (req, res) => {
+// ✅ FIXED: Changed from authenticateHost to verifyHostSession
+router.delete('/draft', verifyHostSession, async (req, res) => {
     try {
         const firebaseUid = req.user.uid;
 
@@ -190,7 +196,8 @@ router.delete('/draft', authenticateHost, async (req, res) => {
 });
 
 // GET MY FESTS
-router.get('/my-fests', authenticateHost, async (req, res) => {
+// ✅ FIXED: Changed from authenticateHost to verifyHostSession
+router.get('/my-fests', verifyHostSession, async (req, res) => {
     try {
         const firebaseUid = req.user.uid;
 
@@ -218,7 +225,8 @@ router.get('/my-fests', authenticateHost, async (req, res) => {
 });
 
 // GET SINGLE FEST
-router.get('/:id', authenticateHost, async (req, res) => {
+// ✅ FIXED: Changed from authenticateHost to verifyHostSession
+router.get('/:id', verifyHostSession, async (req, res) => {
     try {
         const { id } = req.params;
         const firebaseUid = req.user.uid;
@@ -241,6 +249,7 @@ router.get('/:id', authenticateHost, async (req, res) => {
 });
 
 // GET FESTS BY COLLEGE (Public - for user portal)
+// ✅ NO AUTH NEEDED - Public endpoint
 router.get('/by-college/:collegeId', async (req, res) => {
     try {
         const { collegeId } = req.params;
@@ -316,7 +325,6 @@ router.get('/by-college/:collegeId', async (req, res) => {
     }
 });
 
-
 // Helper function
 function formatDateRange(start, end) {
     const startDate = new Date(start);
@@ -331,6 +339,7 @@ function formatDateRange(start, end) {
 }
 
 // GET SINGLE FEST DETAILS (Public - for user portal)
+// ✅ NO AUTH NEEDED - Public endpoint
 router.get('/public/:id', async (req, res) => {
     try {
         const { id } = req.params;

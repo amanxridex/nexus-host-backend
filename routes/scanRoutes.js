@@ -2,16 +2,13 @@ const express = require('express');
 const router = express.Router();
 const scanController = require('../controllers/scanController');
 
-// Auth middleware import check karo
+// ✅ FIXED: Import verifyHostSession properly
 const { verifyHostSession } = require('../middleware/authMiddleware');
 
-// If authMiddleware exports verifyToken directly:
-router.use(authMiddleware.verifyToken || authMiddleware);
-
-// Routes
-router.post('/verify', scanController.verifyTicket);
-router.get('/fest-stats/:festId', scanController.getFestStats);
-router.get('/recent-scans/:festId', scanController.getRecentScans);
-router.post('/log-denied', scanController.logDenied);
+// ✅ FIXED: Use verifyHostSession in all routes
+router.post('/verify', verifyHostSession, scanController.verifyTicket);
+router.get('/fest-stats/:festId', verifyHostSession, scanController.getFestStats);
+router.get('/recent-scans/:festId', verifyHostSession, scanController.getRecentScans);
+router.post('/log-denied', verifyHostSession, scanController.logDenied);
 
 module.exports = router;
