@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const authenticateHost = require('../middleware/authMiddleware');
+const { verifyHostSession } = require('../middleware/authMiddleware');
 const collegeController = require('../controllers/collegeController');
 
 // Public routes (NO AUTH - for user portal)

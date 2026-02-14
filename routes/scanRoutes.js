@@ -3,7 +3,7 @@ const router = express.Router();
 const scanController = require('../controllers/scanController');
 
 // Auth middleware import check karo
-const authMiddleware = require('../middleware/authMiddleware');
+const { verifyHostSession } = require('../middleware/authMiddleware');
 
 // If authMiddleware exports verifyToken directly:
 router.use(authMiddleware.verifyToken || authMiddleware);

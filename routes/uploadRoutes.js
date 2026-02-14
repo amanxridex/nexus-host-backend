@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const authenticateHost = require('../middleware/authMiddleware');  // ✅ Fixed import
+const { verifyHostSession } = require('../middleware/authMiddleware');
 const { upload, handleUploadError } = require('../middleware/uploadMiddleware');
 const uploadController = require('../controllers/uploadController');
 
