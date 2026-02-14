@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser'); // ✅ ADDED
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
@@ -14,24 +15,31 @@ const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
 
-// ✅ Trust proxy for Render (fixes rate-limit warning)
+// ✅ Trust proxy for Render
 app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({
-  origin: '*',
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:5500',
+    'https://reseat.vercel.app', // ✅ Your host frontend
+    'https://your-host-frontend.vercel.app'
+  ],
+  credentials: true, // ✅ IMPORTANT: Allow cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// ✅ ADDED: Cookie parser
+app.use(cookieParser());
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  // ✅ Custom key generator for Render proxy
   keyGenerator: (req) => {
     return req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
   },
-  // ✅ Skip validation warning
   validate: { xForwardedForHeader: false }
 });
 app.use(limiter);
