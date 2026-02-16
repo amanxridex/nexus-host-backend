@@ -24,7 +24,7 @@ app.use(cors({
     'http://localhost:3000',
     'http://127.0.0.1:5500',
     'https://reseat.vercel.app', // ✅ Your host frontend
-    'https://your-host-frontend.vercel.app'
+    'https://reseathost.vercel.app'
   ],
   credentials: true, // ✅ IMPORTANT: Allow cookies
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
