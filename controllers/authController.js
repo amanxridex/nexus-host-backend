@@ -17,7 +17,7 @@ exports.createHostSession = async (req, res) => {
         email: decodedToken.email,
         name: decodedToken.name
       },
-      process.env.COOKIE_SECRET, // ✅ HOST's own secret
+      process.env.HOST_COOKIE_SECRET, // ✅ HOST's own secret
       { expiresIn: '30d' }
     );
     

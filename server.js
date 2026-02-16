@@ -68,4 +68,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Nexus Host API running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log('🔍 HOST_COOKIE_SECRET:', process.env.HOST_COOKIE_SECRET);
+  console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
 });
