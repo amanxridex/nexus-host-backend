@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 // ✅ FIXED: Use verifyHostSession only
 const { verifyHostSession } = require('../middleware/authMiddleware');
+const cacheMiddleware = require('../middleware/cacheMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -250,7 +251,7 @@ router.get('/:id', verifyHostSession, async (req, res) => {
 
 // GET FESTS BY COLLEGE (Public - for user portal)
 // ✅ NO AUTH NEEDED - Public endpoint
-router.get('/by-college/:collegeId', async (req, res) => {
+router.get('/by-college/:collegeId', cacheMiddleware({ EX: 300 }), async (req, res) => {
     try {
         const { collegeId } = req.params;
 
@@ -340,7 +341,7 @@ function formatDateRange(start, end) {
 
 // GET SINGLE FEST DETAILS (Public - for user portal)
 // ✅ NO AUTH NEEDED - Public endpoint
-router.get('/public/:id', async (req, res) => {
+router.get('/public/:id', cacheMiddleware({ EX: 300 }), async (req, res) => {
     try {
         const { id } = req.params;
 

@@ -95,19 +95,29 @@ exports.createHost = async (req, res) => {
     const {
       full_name,
       phone,
+      host_type,
       college_name,
       registration_number,
+      business_name,
+      city,
       designation,
       department,
       year_of_study,
       id_card_url
     } = req.body;
 
-    if (!full_name || !phone || !college_name || !registration_number) {
+    if (!full_name || !phone || !host_type) {
       return res.status(400).json({ 
         error: 'Missing required fields',
-        required: ['full_name', 'phone', 'college_name', 'registration_number']
+        required: ['full_name', 'phone', 'host_type']
       });
+    }
+
+    if (host_type === 'fest' && (!college_name || !registration_number)) {
+        return res.status(400).json({ 
+          error: 'Missing required fest fields',
+          required: ['college_name', 'registration_number']
+        });
     }
 
     const { data: existing } = await supabase
@@ -127,9 +137,12 @@ exports.createHost = async (req, res) => {
         email,
         full_name,
         phone,
+        host_type: host_type || 'fest',
         college_name,
         registration_number,
-        designation: designation || 'Student Organizer',
+        business_name,
+        city,
+        designation: designation || (host_type === 'fest' ? 'Student Organizer' : 'Owner'),
         department,
         year_of_study,
         id_card_url,
