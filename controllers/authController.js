@@ -70,7 +70,7 @@ exports.checkHost = async (req, res) => {
 
     const { data, error } = await supabase
       .from('hosts')
-      .select('id, verification_status, is_active')
+      .select('id, verification_status, is_active, host_type')
       .eq('firebase_uid', uid)
       .single();
 
@@ -81,7 +81,8 @@ exports.checkHost = async (req, res) => {
     res.json({
       exists: !!data,
       status: data?.verification_status || null,
-      isActive: data?.is_active || false
+      isActive: data?.is_active || false,
+      host_type: data?.host_type || null
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
