@@ -24,5 +24,13 @@ router.post(
   handleUploadError,
   uploadController.uploadAvatar
 );
+// Upload property image
+router.post(
+  '/property-image',
+  verifyHostSession,
+  upload.single('file'),
+  handleUploadError,
+  uploadController.uploadPropertyImage
+);
 
 module.exports = router;

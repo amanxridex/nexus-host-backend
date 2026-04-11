@@ -12,6 +12,7 @@ const collegeRoutes = require('./routes/collegeRoutes');
 const festRoutes = require('./routes/festRoutes');
 const scanRoutes = require('./routes/scanRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const propertyRoutes = require('./routes/propertyRoutes');
 const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -55,6 +56,7 @@ app.use('/api/colleges', collegeRoutes);
 app.use('/api/fest', festRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/properties', propertyRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

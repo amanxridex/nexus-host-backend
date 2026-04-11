@@ -85,3 +85,43 @@ exports.uploadAvatar = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Upload property image
+exports.uploadPropertyImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { uid } = req.user;
+    const file = req.file;
+
+    // Generate filename
+    const filename = `${uid}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '')}`;
+
+    // Upload to 'properties' bucket
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('properties')
+      .upload(filename, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('properties')
+      .getPublicUrl(filename);
+
+    res.json({
+      success: true,
+      url: publicUrl,
+      filename: filename
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
