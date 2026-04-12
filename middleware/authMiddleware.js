@@ -1,13 +1,18 @@
 const admin = require('../config/firebase');
 const jwt = require('jsonwebtoken');
 
-// ✅ NEW: Verify host session cookie (INDEPENDENT from user backend)
+// ✅ NEW: Verify host session dynamically via cookie OR Bearer Token Fallback
 const verifyHostSession = async (req, res, next) => {
     try {
-        const token = req.cookies?.host_session;
+        let token = req.cookies?.host_session;
+        
+        // Fallback: If mobile strict browser stripped cookie, check headers
+        if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+            token = req.headers.authorization.split(' ')[1];
+        }
         
         if (!token) {
-            console.log('❌ No host_session cookie');
+            console.log('❌ No host_session cookie or Bearer token');
             return res.status(401).json({ error: 'No session found. Please login.' });
         }
 

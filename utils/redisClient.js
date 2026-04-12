@@ -10,7 +10,9 @@ async function connectRedis() {
         });
 
         redisClient.on('error', (err) => {
-            console.error('[Redis Client Error]', err.message);
+            if (!err.message.includes('Socket closed unexpectedly')) {
+                console.error('[Redis Client Error]', err.message);
+            }
             isRedisConnected = false;
         });
 

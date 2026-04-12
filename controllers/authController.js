@@ -33,6 +33,7 @@ exports.createHostSession = async (req, res) => {
     res.json({
       success: true,
       message: 'Host session created',
+      token: sessionToken,
       user: {
         uid: decodedToken.uid,
         email: decodedToken.email,
