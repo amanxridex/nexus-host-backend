@@ -14,6 +14,7 @@ const scanRoutes = require('./routes/scanRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const gymRoutes = require('./routes/gymRoutes');
+const restaurantRoutes = require('./routes/restaurantRoutes');
 const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/gyms', gymRoutes);
+app.use('/api/restaurants', restaurantRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
