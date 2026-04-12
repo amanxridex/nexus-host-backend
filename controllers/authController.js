@@ -115,12 +115,7 @@ exports.createHost = async (req, res) => {
       });
     }
 
-    if (host_type === 'fest' && (!college_name || !registration_number)) {
-        return res.status(400).json({ 
-          error: 'Missing required fest fields',
-          required: ['college_name', 'registration_number']
-        });
-    }
+    // Removed strict college_name enforcement as Fests now cover general events (Concerts, Screenings) instead of just college fests.
 
     const { data: existing } = await supabase
       .from('hosts')
