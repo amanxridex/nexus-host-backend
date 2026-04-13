@@ -74,23 +74,28 @@ exports.getMyRestaurants = async (req, res) => {
   }
 };
 
-// Edit restaurant properties
+// Edit restaurant properties (Staged Update)
 exports.updateRestaurant = async (req, res) => {
   try {
     const { id } = req.params;
     const { uid } = req.user;
     
     // Validate Ownership
-    const { data: host } = await require('../config/database').from('hosts').select('id').eq('firebase_uid', uid).single();
+    const db = require('../config/database');
+    const { data: host } = await db.from('hosts').select('id').eq('firebase_uid', uid).single();
     if (!host) return res.status(403).json({ error: 'Auth context invalid' });
 
-    const { data: restCheck } = await require('../config/database').from('restaurants').select('id').eq('id', id).eq('host_id', host.id).single();
+    const { data: restCheck } = await db.from('restaurants').select('id').eq('id', id).eq('host_id', host.id).single();
     if (!restCheck) return res.status(403).json({ error: 'Permission Denied. Property mismatch.' });
 
-    const updates = { ...req.body };
-    delete updates.id; delete updates.host_id; // Secure immutable vectors
+    const payload = { ...req.body };
+    delete payload.id; delete payload.host_id; // Secure immutable vectors
 
-    const { data, error } = await require('../config/database').from('restaurants').update(updates).eq('id', id).select();
+    // We do NOT update columns physically anymore. We stage them natively.
+    const { data, error } = await db.from('restaurants').update({
+        status: 'update_pending',
+        pending_changes: payload
+    }).eq('id', id).select();
 
     if (error) throw error;
     res.json({ success: true, data: data[0] });
