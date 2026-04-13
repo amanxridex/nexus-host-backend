@@ -73,3 +73,48 @@ exports.getMyRestaurants = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Edit restaurant properties
+exports.updateRestaurant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { uid } = req.user;
+    
+    // Validate Ownership
+    const { data: host } = await require('../config/database').from('hosts').select('id').eq('firebase_uid', uid).single();
+    if (!host) return res.status(403).json({ error: 'Auth context invalid' });
+
+    const { data: restCheck } = await require('../config/database').from('restaurants').select('id').eq('id', id).eq('host_id', host.id).single();
+    if (!restCheck) return res.status(403).json({ error: 'Permission Denied. Property mismatch.' });
+
+    const updates = { ...req.body };
+    delete updates.id; delete updates.host_id; // Secure immutable vectors
+
+    const { data, error } = await require('../config/database').from('restaurants').update(updates).eq('id', id).select();
+
+    if (error) throw error;
+    res.json({ success: true, data: data[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Toggle status cleanly
+exports.toggleRestaurantStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const { uid } = req.user;
+    
+    const { data: host } = await require('../config/database').from('hosts').select('id').eq('firebase_uid', uid).single();
+    const { data: restCheck } = await require('../config/database').from('restaurants').select('id').eq('id', id).eq('host_id', host.id).single();
+    if (!host || !restCheck) return res.status(403).json({ error: 'Permission Denied.' });
+
+    const { error } = await require('../config/database').from('restaurants').update({ status }).eq('id', id);
+    if (error) throw error;
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
