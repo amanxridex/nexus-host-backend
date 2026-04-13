@@ -99,10 +99,10 @@ exports.uploadPropertyImage = async (req, res) => {
     // Generate filename
     const filename = `${uid}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '')}`;
 
-    // Upload to 'properties' bucket
+    // Upload to 'host-documents' bucket
     const { data: uploadData, error: uploadError } = await supabase
       .storage
-      .from('properties')
+      .from('host-documents')
       .upload(filename, file.buffer, {
         contentType: file.mimetype,
         upsert: true
@@ -113,7 +113,7 @@ exports.uploadPropertyImage = async (req, res) => {
     // Get public URL
     const { data: { publicUrl } } = supabase
       .storage
-      .from('properties')
+      .from('host-documents')
       .getPublicUrl(filename);
 
     res.json({
