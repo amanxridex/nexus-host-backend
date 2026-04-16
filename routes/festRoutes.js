@@ -34,7 +34,7 @@ router.post('/create', verifyHostSession, async (req, res) => {
             startDate, endDate, isPaid, ticketPrice, earlyBirdPrice,
             isUnlimited, totalSeats, allowOutside, otherColleges, generalPublic,
             idRequired, idFields, coordinatorName, contactPhone, contactEmail,
-            whatsapp, venue, bannerImage
+            whatsapp, venue, bannerImage, metadata
         } = req.body;
 
         if (!festName || !festType || !description || !startDate || !endDate) {
@@ -92,6 +92,7 @@ router.post('/create', verifyHostSession, async (req, res) => {
                 contact_email: contactEmail,
                 whatsapp_number: whatsapp,
                 venue,
+                metadata: metadata || {},
                 status: 'published',
                 submitted_at: new Date().toISOString()
             })
@@ -246,6 +247,29 @@ router.get('/:id', verifyHostSession, async (req, res) => {
     } catch (error) {
         console.error('Get fest error:', error);
         res.status(500).json({ error: 'Failed to fetch fest' });
+    }
+// GET FESTS BY CATEGORY (Public - for user portal)
+// ✅ NO AUTH NEEDED - Public endpoint
+router.get('/public/category/:category', cacheMiddleware({ EX: 300 }), async (req, res) => {
+    try {
+        const { category } = req.params;
+
+        const { data: fests, error } = await supabase
+            .from('fests')
+            .select(`
+                *,
+                hosts (full_name, college_name)
+            `)
+            .eq('fest_type', category)
+            .eq('status', 'published')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.json({ success: true, fests });
+    } catch (error) {
+        console.error('Get fests by category error:', error);
+        res.status(500).json({ error: 'Failed to fetch fests' });
     }
 });
 
